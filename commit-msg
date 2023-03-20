@@ -19,3 +19,22 @@ if ! echo "$commitTitle" | grep -qE '^(?:feat|fix|docs|style|refactor|perf|test|
 	echo "Please see https://github.com/angular/angular.js/blob/master/DEVELOPERS.md#commit-message-format"
 	exit 1
 fi
+
+if echo "$commitTitle" | grep -qE '^(?:\w+):'; then
+
+  mods=$(echo $(git diff --cached --name-only | grep / | sed -e 's,/.*,,g' | sort -u) | sed -e 's/ /,/g')
+
+  if [ "${mods}" = "" ]; then
+    exit 0
+  fi
+
+  tmpfile=$(mktemp)
+
+  echo "$commitTitle" | sed -e "s/:/\(${mods}\):/" > ${tmpfile}
+  tail -n +2 $1 >> ${tmpfile}
+
+  mv ${tmpfile} "$1"
+
+  exit 0
+fi
+
