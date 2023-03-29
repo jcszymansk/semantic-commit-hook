@@ -19,7 +19,10 @@ if ! echo "$commitTitle" | grep -qE '^(?:feat|fix|docs|style|refactor|perf|test|
 	exit 1
 fi
 
-if echo "$commitTitle" | grep -qE '^(?:\w+):'; then
+automods="$(git config --default true --get semantic-commit.auto-modules)"
+
+if [ "$automods" = "true" ] && echo "$commitTitle" | grep -qE '^(?:\w+):'
+then
 
   mods=$(echo $(git diff --cached --name-only | grep / | sed -e 's,/.*,,g' | sort -u) | sed -e 's/ /,/g')
 
@@ -34,6 +37,5 @@ if echo "$commitTitle" | grep -qE '^(?:\w+):'; then
 
   mv ${tmpfile} "$1"
 
-  exit 0
 fi
 
