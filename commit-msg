@@ -1,41 +1,43 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nu
 
-if [ -z "$1" ]; then
-	echo "Missing argument (commit message). Did you try to run this manually?"
-	exit 1
-fi
+let semRegex = '^(?:feat|fix|docs|style|refactor|perf|test|chore)(?:\(?(?:[A-Za-z0-9_,-]+|\s|\-|_|,)?\))?:\s\w+'
+let automods = (git config --default true --get semantic-commit.auto-modules) == "true"
 
-commitTitle="$(cat $1 | head -n1)"
+def checkSem [ commitMsg: string ] {
+  if $commitMsg =~ $semRegex {
+    return
+  }
+  print -e "Your commit title did not follow semantic versioning: ($commitMsg)"
+  exit 1
+}
 
-# ignore merge requests
-if echo "$commitTitle" | grep -qE "^Merge branch \'"; then
-	exit 0
-fi
-
-# check semantic versioning scheme
-if ! echo "$commitTitle" | grep -qE '^(?:feat|fix|docs|style|refactor|perf|test|chore)(?:\(?(?:[A-Za-z0-9_,-]+|\s|\-|_|,)?\))?:\s\w+'; then
-	echo "Your commit title did not follow semantic versioning: $commitTitle"
-	echo "Please see https://github.com/angular/angular.js/blob/master/DEVELOPERS.md#commit-message-format"
-	exit 1
-fi
-
-automods="$(git config --default true --get semantic-commit.auto-modules)"
-
-if [ "$automods" = "true" ] && echo "$commitTitle" | grep -qE '^(?:\w+):'
-then
-
-  mods=$(echo $(git diff --cached --name-only | grep / | sed -e 's,/.*,,g' | sort -u) | sed -e 's/ /,/g')
-
-  if [ "${mods}" = "" ]; then
+def main [ commitMsg: string ] {
+  if $commitMsg == "" {
+    print -e "Missing argument (commit message). Did you try to run this manually?"
+    exit 1
+  }
+  let commitTitle = (open $commitMsg | lines | first)
+  if $commitTitle =~ "^Merge branch \'" {
     exit 0
-  fi
+  }
+  checkSem $commitTitle
+  if $automods and $commitTitle =~ '^(?:\w+):' {
+    let mods = (
+      git diff --cached --name-only
+      | lines
+      | where $it =~ '/'
+      | str replace -a '/.*$' ''
+      | str join ','
+    )
+    if $mods == "" {
+      exit 0
+    }
+    let tmpfile = (mktemp)
+    let replace = ($mods | str replace '(.*)' '($1):')
+    let newCommitTitle = ($commitTitle | str replace  -n ':' $replace)
+    $newCommitTitle | save -a $tmpfile
+    open $commitMsg | lines | skip 1 | save -a $tmpfile
 
-  tmpfile=$(mktemp)
-
-  echo "$commitTitle" | sed -e "s/:/\(${mods}\):/" > ${tmpfile}
-  tail -n +2 $1 >> ${tmpfile}
-
-  mv ${tmpfile} "$1"
-
-fi
-
+    mv -f $tmpfile $commitMsg
+  }
+}
