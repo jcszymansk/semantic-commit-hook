@@ -27,6 +27,8 @@ def main [ commitMsg: string ] {
       | lines
       | where $it =~ '/'
       | str replace -a '/.*$' ''
+      | sort -n
+      | uniq
       | str join ','
     )
     if $mods == "" {
