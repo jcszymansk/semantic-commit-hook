@@ -1,13 +1,31 @@
 #!/usr/bin/env nu
 
-let semRegex = '^(?:feat|fix|docs|style|refactor|perf|test|chore)(?:\(?(?:[A-Za-z0-9_,-]+|\s|\-|_|,)?\))?:\s\w+'
-let automods = (git config --default true --get semantic-commit.auto-modules) == "true"
+let allowedTypes = [
+  'feat',
+  'fix',
+  'docs',
+  'style',
+  'refactor',
+  'perf',
+  'test',
+  'chore',
+  'wip',
+  'BREAKING CHANGE'
+]
+
+let scopeMatch = '(?:[A-Za-z0-9_,-]+)'
+
+
+let semRegex = [ '^(?:', ($allowedTypes | str join '|'), ')(?:\((?:' $scopeMatch ', ?)*', $scopeMatch, '\))?:\s\w+' ]
+    | str join ''
+
+let automods = (^git config --default true --get semantic-commit.auto-modules) == "true"
 
 def checkSem [ commitMsg: string ] {
   if $commitMsg =~ $semRegex {
     return
   }
-  print -e "Your commit title did not follow semantic versioning: ($commitMsg)"
+  print -e $"Your commit title did not follow semantic versioning: ($commitMsg)"
   exit 1
 }
 
@@ -26,7 +44,7 @@ def main [ commitMsg: string ] {
       git diff --cached --name-only
       | lines
       | where $it =~ '/'
-      | str replace -a '/.*$' ''
+      | str replace -a -r '/.*$' ''
       | sort -n
       | uniq
       | str join ','
@@ -35,8 +53,10 @@ def main [ commitMsg: string ] {
       exit 0
     }
     let tmpfile = (mktemp)
-    let replace = ($mods | str replace '(.*)' '($1):')
-    let newCommitTitle = ($commitTitle | str replace  -n ':' $replace)
+    let replace = [ '(', $mods, ')' ] | str join
+    let split = ($commitTitle | split row -n 2 ':')
+    let modType = ([ $split.0, $replace ] | str join '')
+    let newCommitTitle = ([ $modType, $split.1 ] | str join ':')
     $newCommitTitle | save -a $tmpfile
     open $commitMsg | lines | skip 1 | save -a $tmpfile
 
