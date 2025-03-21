@@ -10,6 +10,11 @@ let allowedTypes = [
   'test',
   'chore',
   'wip',
+  "ci",
+  "build",
+  "misc",
+  "revert",
+  "workaround",
   'BREAKING CHANGE'
 ]
 
